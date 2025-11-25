@@ -5,8 +5,8 @@ videos:
     url: "https://www.youtube.com/watch?v=7g1pmHSWHe0"
     channel: "exurb1a"
     platform: "YouTube"
-    added: 2024-11-05
-    note: "Great mental model for thinking about compute vs. graphics workloads."
+    added: 2025-11-24
+    note: "Young Tao sets out to kill the mythical "snake" that took his father, believing that then everything will be okay."
 ---
 
 ### Why these made the cut
