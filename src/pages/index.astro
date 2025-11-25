@@ -1,0 +1,100 @@
+---
+import Layout from '../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+import { Hash, Terminal, Globe } from 'lucide-react';
+import { GlowBorder } from '../components/GlowBorder';
+import { TypeIcon } from '../components/TypeIcon';
+
+const posts = (await getCollection('blog')).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+).slice(0, 3);
+
+const allResources = await getCollection('resources');
+const quickAccessResources = allResources
+  .filter(res => res.data['quick-access'] === 'yes')
+  .slice(0, 4);
+---
+
+<Layout title="Terminal Scope">
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-8 animate-fade-in">
+      {/* Latest Blog Panel */}
+      <section>
+        <div class="flex items-center justify-between mb-4 border-b pb-2 border-surface">
+          <h2 class="text-lg font-bold flex items-center gap-2">
+            <Hash size={20} className="text-accent" /> 
+            LATEST_LOGS
+          </h2>
+          <span class="text-xs opacity-50 font-mono">dir: ~/blog</span>
+        </div>
+        <div class="space-y-4">
+          {posts.map((post) => (
+            <a href={`/blog/${post.id}`} class="block">
+                <GlowBorder className="p-4 cursor-pointer group">
+                  <div class="flex justify-between items-start mb-2">
+                    <span class="text-xs font-mono px-2 py-0.5 rounded bg-surface text-dim">
+                      {post.data.category}
+                    </span>
+                    <span class="text-xs font-mono opacity-50">{post.data.date.toISOString().split('T')[0]}</span>
+                  </div>
+                  <h3 class="font-bold text-lg mb-1 leading-tight group-hover:text-accent transition-colors">{post.data.title}</h3>
+                  <p class="text-sm opacity-80 line-clamp-2 text-dim">{post.data.excerpt}</p>
+                </GlowBorder>
+            </a>
+          ))}
+        </div>
+      </section>
+
+      {/* Intro & Stats Panel */}
+      <section class="space-y-8">
+        <div>
+          <div class="flex items-center justify-between mb-4 border-b pb-2 border-surface">
+            <h2 class="text-lg font-bold flex items-center gap-2">
+              <Terminal size={20} className="text-success" /> 
+              SYSTEM_STATUS
+            </h2>
+          </div>
+          <div class="p-4 rounded-sm font-mono text-sm leading-relaxed bg-surface">
+            <p class="mb-4">
+              <span class="text-success">guest@terminal-scope:~$</span> Welcome to the digital garden. 
+              This interface is designed for high-efficiency knowledge retrieval.
+            </p>
+            <div class="grid grid-cols-2 gap-2 mt-4 text-xs">
+              <div class="flex justify-between">
+                <span class="text-dim">UPTIME:</span>
+                <span>243 days</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-dim">KERNEL:</span>
+                <span>5.15.0-76</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-dim">MEMORY:</span>
+                <span>16GB / 64GB</span>
+              </div>
+              <div class="flex justify-between">
+                <span class="text-dim">LOAD:</span>
+                <span class="text-success">0.12, 0.04</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-4 border-b pb-2 border-surface">
+            <h2 class="text-lg font-bold flex items-center gap-2">
+              <Globe size={20} className="text-link" /> 
+              QUICK_ACCESS
+            </h2>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+             {quickAccessResources.map(res => (
+               <a href={`/resources/${res.id}`} class="flex items-center gap-2 text-sm p-2 border border-transparent hover:border-dim cursor-pointer transition-colors">
+                  <TypeIcon type={res.data.type} />
+                  <span class="truncate">{res.data.title}</span>
+               </a>
+             ))}
+          </div>
+        </div>
+      </section>
+    </div>
+</Layout>

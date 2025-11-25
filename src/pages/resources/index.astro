@@ -1,0 +1,37 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+import { GlowBorder } from '../../components/GlowBorder';
+import { TypeIcon } from '../../components/TypeIcon';
+
+const resources = await getCollection('resources');
+---
+
+<Layout title="Resources | Terminal Scope">
+    <div class="animate-fade-in">
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {resources.map((res) => (
+          <a href={`/resources/${res.id}`} class="block h-full">
+              <GlowBorder className="p-4 group cursor-pointer h-full flex flex-col hover:-translate-y-1 transition-transform">
+                 <div class="flex justify-between items-start mb-4">
+                   <div class="p-2 rounded-full bg-surface text-link group-hover:text-accent transition-colors">
+                     <TypeIcon type={res.data.type} />
+                   </div>
+                   <span class="text-xs font-mono opacity-50 border px-1 rounded border-dim">
+                     {res.data.type.toUpperCase()}
+                   </span>
+                 </div>
+                 
+                 <h3 class="font-bold mb-2 group-hover:text-accent transition-colors">{res.data.title}</h3>
+                 
+                 <div class="mt-auto pt-4 flex justify-between items-center text-xs font-mono text-dim">
+                    <span>{res.data.topic}</span>
+                    <span>{res.data.duration || res.data.domain}</span>
+                 </div>
+              </GlowBorder>
+          </a>
+        ))}
+      </div>
+    </div>
+</Layout>
+

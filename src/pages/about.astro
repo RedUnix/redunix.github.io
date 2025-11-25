@@ -1,0 +1,30 @@
+---
+import Layout from '../layouts/Layout.astro';
+---
+
+<Layout title="About | Terminal Scope">
+    <div class="animate-fade-in max-w-2xl mx-auto">
+       <div class="bg-surface p-1 rounded-t-md flex items-center gap-2 px-3">
+          <div class="w-3 h-3 rounded-full bg-error"></div>
+          <div class="w-3 h-3 rounded-full bg-accent"></div>
+          <div class="w-3 h-3 rounded-full bg-success"></div>
+          <span class="ml-2 text-xs opacity-50 font-mono">vim ~/about.md</span>
+       </div>
+       <div class="border-x border-b p-6 font-mono text-sm leading-loose whitespace-pre-wrap border-surface">
+{`# About the Creator
+
+I am a digital architect focused on the intersection of minimal design and maximal functionality. This website is an experiment in "Digital Gardening" — a place where ideas are planted as seeds (notes) and grow into evergreen trees (articles).
+
+## Tech Stack
+- Frontend: Astro + React + Tailwind
+- Theme: Gruvbox (Hard)
+- CMS: Email-based (Simulated)
+- Hosting: Vercel
+
+## Contact
+Email: hello@terminal-scope.com
+GitHub: @terminal-scope`}
+         <span class="inline-block w-2 h-4 bg-accent animate-pulse align-middle ml-1"></span>
+       </div>
+    </div>
+</Layout>

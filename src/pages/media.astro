@@ -1,0 +1,275 @@
+---
+import Layout from '../layouts/Layout.astro';
+import Parser from 'rss-parser';
+import { getEntry } from 'astro:content';
+import { ListVideo, Play } from 'lucide-react';
+import { MediaPlayer } from '../components/MediaPlayer';
+import { MediaFavoritesList } from '../components/MediaFavoritesList';
+import type { ChannelWatch, FavoriteVideo, Playlist, PlaylistVideo, YouTubePlaylist } from '../types/media';
+
+type FeedItem = {
+  id?: string;
+  title?: string;
+  link?: string;
+  isoDate?: string;
+  pubDate?: string;
+  enclosure?: { url?: string };
+  [key: string]: unknown;
+};
+
+const favoritesEntry = await getEntry('media', 'favorites');
+const playlistEntry = await getEntry('media', 'playlist');
+
+const extractYoutubeId = (rawUrl: string): string | undefined => {
+  if (!rawUrl) return undefined;
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname.includes('youtu.be')) {
+      return url.pathname.replace('/', '') || undefined;
+    }
+    if (url.hostname.includes('youtube.com')) {
+      if (url.pathname === '/watch') {
+        return url.searchParams.get('v') ?? undefined;
+      }
+      if (url.pathname.startsWith('/shorts/')) {
+        return url.pathname.split('/')[2];
+      }
+      if (url.pathname.startsWith('/live/')) {
+        return url.pathname.split('/')[2];
+      }
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+};
+
+const extractPlaylistId = (rawUrl: string): string | undefined => {
+  if (!rawUrl) return undefined;
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname.includes('youtube.com')) {
+      if (url.pathname === '/watch') {
+        return url.searchParams.get('list') ?? undefined;
+      }
+      if (url.pathname.startsWith('/playlist')) {
+        return url.searchParams.get('list') ?? undefined;
+      }
+    }
+  } catch {
+    return undefined;
+  }
+  return undefined;
+};
+
+const rawFavorites = (favoritesEntry?.data.videos ?? []) as (FavoriteVideo & { added?: Date })[];
+const channels = (playlistEntry?.data.channels ?? []) as ChannelWatch[];
+const rawPlaylists = (playlistEntry?.data.playlists ?? []) as (YouTubePlaylist & { playlistId?: string })[];
+// Extract playlist ID from URL if provided, otherwise use the playlistId field
+const youtubePlaylists: YouTubePlaylist[] = rawPlaylists.map((playlist) => {
+  const extractedId = extractPlaylistId(playlist.url);
+  return {
+    ...playlist,
+    playlistId: extractedId || playlist.playlistId || '',
+  };
+}).filter((playlist) => playlist.playlistId); // Filter out playlists without valid IDs
+
+const favorites = rawFavorites.map((video) => ({
+  ...video,
+  added: video.added ? video.added.toISOString() : undefined,
+  videoId: extractYoutubeId(video.url),
+}));
+
+const parser = new Parser<Record<string, unknown>, FeedItem>({
+  customFields: {
+    item: [['media:group', 'mediaGroup'], ['media:thumbnail', 'mediaThumbnail']],
+  },
+});
+
+const channelFeeds = await Promise.all(
+  channels.map(async (channel) => {
+    const feedUrl = `https://www.youtube.com/feeds/videos.xml?channel_id=${channel.channelId}`;
+    try {
+      const feed = await parser.parseURL(feedUrl);
+      return (feed.items ?? []).map((item) => {
+        const parsedId = item.id?.split(':').pop();
+        let inferredId = parsedId;
+        if (!inferredId && item.link) {
+          try {
+            const url = new URL(item.link);
+            inferredId = url.searchParams.get('v') ?? undefined;
+          } catch {
+            inferredId = undefined;
+          }
+        }
+        const fallbackThumb = inferredId ? `https://i.ytimg.com/vi/${inferredId}/hqdefault.jpg` : undefined;
+        const thumbnail =
+          (item as unknown as { mediaGroup?: { mediaThumbnail?: { url?: string }[] } }).mediaGroup?.mediaThumbnail?.[0]?.url ||
+          (item.mediaThumbnail as unknown as { url?: string } | undefined)?.url ||
+          item.enclosure?.url ||
+          fallbackThumb;
+
+        return {
+          title: item.title ?? 'Untitled video',
+          link: item.link ?? (inferredId ? `https://www.youtube.com/watch?v=${inferredId}` : '#'),
+          published: item.isoDate ?? item.pubDate ?? new Date().toISOString(),
+          channelName: feed.title ?? channel.name,
+          channelUrl: channel.url,
+          thumbnail,
+          videoId: inferredId,
+        };
+      });
+    } catch (error) {
+      console.warn(`Failed to load feed for ${channel.name}`, error);
+      return [];
+    }
+  })
+);
+
+const channelPlaylists: Playlist[] = channels.map((channel, index) => ({
+  id: channel.channelId,
+  title: channel.name,
+  url: channel.url,
+  note: channel.note,
+  videos: channelFeeds[index] ?? [],
+}));
+
+const playlistFeeds = await Promise.all(
+  youtubePlaylists.map(async (playlist) => {
+    const feedUrl = `https://www.youtube.com/feeds/videos.xml?playlist_id=${playlist.playlistId}`;
+    try {
+      const feed = await parser.parseURL(feedUrl);
+      return (feed.items ?? []).map((item) => {
+        const parsedId = item.id?.split(':').pop();
+        let inferredId = parsedId;
+        if (!inferredId && item.link) {
+          try {
+            const url = new URL(item.link);
+            inferredId = url.searchParams.get('v') ?? undefined;
+          } catch {
+            inferredId = undefined;
+          }
+        }
+        const fallbackThumb = inferredId ? `https://i.ytimg.com/vi/${inferredId}/hqdefault.jpg` : undefined;
+        const thumbnail =
+          (item as unknown as { mediaGroup?: { mediaThumbnail?: { url?: string }[] } }).mediaGroup?.mediaThumbnail?.[0]?.url ||
+          (item.mediaThumbnail as unknown as { url?: string } | undefined)?.url ||
+          item.enclosure?.url ||
+          fallbackThumb;
+
+        return {
+          title: item.title ?? 'Untitled video',
+          link: item.link ?? (inferredId ? `https://www.youtube.com/watch?v=${inferredId}` : '#'),
+          published: item.isoDate ?? item.pubDate ?? new Date().toISOString(),
+          channelName: feed.title ?? playlist.name,
+          channelUrl: playlist.url,
+          thumbnail,
+          videoId: inferredId,
+        };
+      });
+    } catch (error) {
+      console.warn(`Failed to load feed for playlist ${playlist.name}`, error);
+      return [];
+    }
+  })
+);
+
+const youtubePlaylistObjects: Playlist[] = youtubePlaylists.map((playlist, index) => ({
+  id: playlist.playlistId,
+  title: playlist.name,
+  url: playlist.url,
+  note: playlist.note,
+  videos: playlistFeeds[index] ?? [],
+}));
+
+const chronologicalFeed = channelPlaylists
+  .flatMap((playlist) => playlist.videos)
+  .filter((item) => item.link && item.published)
+  .sort((a, b) => new Date(b.published).valueOf() - new Date(a.published).valueOf())
+  .slice(0, 12);
+
+const favoritesPlaylist: Playlist = {
+  id: 'favorites',
+  title: 'Curated Favorites',
+  note: 'Hand-picked talks worth replaying',
+  url: '#',
+  videos: favorites
+    .filter((video) => video.videoId)
+    .map((video) => ({
+      videoId: video.videoId,
+      title: video.title,
+      link: video.url,
+      published: video.added ?? new Date().toISOString(),
+      thumbnail: video.videoId ? `https://i.ytimg.com/vi/${video.videoId}/hqdefault.jpg` : undefined,
+      channelName: video.channel ?? 'Favorites',
+      channelUrl: video.url,
+    })) as PlaylistVideo[],
+};
+
+const chronologicalPlaylist: Playlist = {
+  id: 'chronological',
+  title: 'Chronological Feed',
+  note: 'Newest uploads across the watchlist',
+  url: '#',
+  videos: chronologicalFeed,
+};
+
+const playlists: Playlist[] = [favoritesPlaylist, chronologicalPlaylist, ...channelPlaylists, ...youtubePlaylistObjects];
+---
+
+<Layout title="Media Hub">
+  <div class="grid gap-8 lg:grid-cols-[minmax(0,320px)_1fr] animate-fade-in">
+    <aside class="space-y-8">
+      <div>
+        <header class="flex items-center gap-2 border-b border-surface pb-3 mb-4">
+          <Play size={20} className="text-accent" />
+          <div>
+            <h2 class="text-lg font-bold">Curated Favorites</h2>
+            <p class="text-xs text-dim">Individual videos worth replaying</p>
+          </div>
+        </header>
+        <MediaFavoritesList videos={favorites} client:load />
+      </div>
+
+      <div>
+        <header class="flex items-center gap-2 border-b border-surface pb-3 mb-4">
+          <ListVideo size={20} className="text-success" />
+          <div>
+            <h2 class="text-lg font-bold">Channel Watchlist</h2>
+            <p class="text-xs text-dim">Feeds that power the player</p>
+          </div>
+        </header>
+        <ul class="space-y-3">
+          {channels.map((channel) => (
+            <li class="border border-surface rounded-sm p-3">
+              <div class="flex items-center justify-between gap-3 mb-1">
+                <a href={channel.url} class="font-semibold text-sm hover:text-accent" target="_blank" rel="noopener noreferrer">
+                  {channel.name}
+                </a>
+                <span class="text-[10px] uppercase tracking-wide text-dim">YouTube</span>
+              </div>
+              {channel.note && <p class="text-xs text-dim">{channel.note}</p>}
+            </li>
+          ))}
+          {youtubePlaylists.map((playlist) => (
+            <li class="border border-surface rounded-sm p-3">
+              <div class="flex items-center justify-between gap-3 mb-1">
+                <a href={playlist.url} class="font-semibold text-sm hover:text-accent" target="_blank" rel="noopener noreferrer">
+                  {playlist.name}
+                </a>
+                <span class="text-[10px] uppercase tracking-wide text-dim">Playlist</span>
+              </div>
+              {playlist.note && <p class="text-xs text-dim">{playlist.note}</p>}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+    </aside>
+
+    <section>
+      <MediaPlayer playlists={playlists} client:load />
+    </section>
+  </div>
+</Layout>
+

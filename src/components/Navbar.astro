@@ -1,0 +1,29 @@
+---
+const pathname = Astro.url.pathname;
+const currentPath = pathname === '/' ? 'home' : pathname.split('/')[1] || 'home';
+
+const links = [
+  { name: 'home', path: '/' },
+  { name: 'blog', path: '/blog' },
+  { name: 'resources', path: '/resources' },
+  { name: 'media', path: '/media' },
+  { name: 'about', path: '/about' },
+];
+---
+<nav class="flex flex-col md:flex-row gap-4 mb-8 text-sm md:text-base font-mono border-b-2 border-dashed pb-4 border-surface">
+  {links.map((link) => (
+    <a
+      href={link.path}
+      class:list={[
+        "flex items-center gap-2 px-3 py-1 rounded transition-colors duration-200 outline-none focus:ring-1 focus:ring-accent",
+        currentPath === link.name 
+          ? "text-bg bg-accent font-bold" 
+          : "text-text bg-transparent hover:text-accent"
+      ]}
+    >
+      <span class="opacity-50">&gt;</span>
+      {link.name.toUpperCase()}
+    </a>
+  ))}
+</nav>
+

@@ -1,0 +1,155 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { getCollection } from 'astro:content';
+
+const rawPosts = (await getCollection('blog')).sort(
+	(a, b) => b.data.date.valueOf() - a.data.date.valueOf()
+);
+
+const calculateReadTime = (content: string | undefined) => {
+	if (!content) return 1;
+	const words = content
+		.trim()
+		.split(/\s+/)
+		.filter(Boolean).length;
+	return Math.max(1, Math.round(words / 250));
+};
+
+const enrichedPosts = rawPosts.map((post) => ({
+	...post,
+	readTime: calculateReadTime(post.body),
+}));
+
+const categories = ['All', ...new Set(enrichedPosts.map((p) => p.data.category))];
+---
+
+<Layout title="Blog | Terminal Scope">
+    <div class="animate-fade-in">
+       <div class="flex flex-col md:flex-row gap-8">
+          {/* Sidebar / Categories */}
+          <aside class="w-full md:w-64 flex-shrink-0">
+            <h3 class="text-sm font-bold mb-4 opacity-50 uppercase tracking-wider">Directories</h3>
+            <ul class="space-y-1 font-mono text-sm" id="category-list">
+               {categories.map((cat, i) => (
+                 <li>
+                    <button
+                      type="button"
+                      class="group w-full px-3 py-2 flex justify-between items-center rounded-sm transition-colors text-left border border-transparent"
+                      data-category-btn
+                      data-category={cat}
+                      data-active={i === 0 ? 'true' : 'false'}
+                    >
+                        <span>{i===0 ? './' : '/'}{cat.toLowerCase()}</span>
+                        <span class="text-xs opacity-30 group-hover:opacity-100">dr-x</span>
+                    </button>
+                 </li>
+               ))}
+            </ul>
+          </aside>
+
+          {/* Main List */}
+          <div class="flex-1">
+             <div class="mb-4 pb-2 border-b flex text-xs opacity-50 font-mono border-surface">
+                <span class="w-20">SIZE</span>
+                <span class="w-24">USER</span>
+                <span class="w-32">DATE</span>
+                <span class="flex-1">NAME</span>
+             </div>
+             <div class="space-y-2" data-post-list>
+                {enrichedPosts.map((post) => (
+                  <a href={`/blog/${post.id}`} data-post data-category={post.data.category} class="flex flex-col md:flex-row font-mono text-sm p-2 hover:bg-surface cursor-pointer group transition-colors rounded-sm">
+                    <span class="hidden md:inline-block w-20 opacity-50">{post.readTime} min</span>
+                    <span class="hidden md:inline-block w-24 opacity-50 text-accent">root</span>
+                    <span class="w-32 opacity-70 text-dim">{post.data.date.toISOString().split('T')[0]}</span>
+                    <span class="flex-1 font-bold group-hover:text-accent">{post.data.title}</span>
+                  </a>
+                ))}
+                <div data-no-posts class="hidden p-4 border border-dashed border-dim text-dim font-mono text-sm rounded-sm">
+                  No posts in this category yet.
+                </div>
+             </div>
+          </div>
+       </div>
+    </div>
+</Layout>
+
+<script is:inline>
+  const initCategoryFilters = () => {
+    const params = new URLSearchParams(window.location.search);
+    let activeCategory = params.get('category') || 'All';
+    const buttons = document.querySelectorAll('[data-category-btn]');
+    const posts = document.querySelectorAll('[data-post]');
+    const emptyState = document.querySelector('[data-no-posts]');
+
+    if (!buttons.length || !posts.length) return;
+
+    const updateUI = (pushState = false) => {
+      let visibleCount = 0;
+      buttons.forEach((btn) => {
+        const isActive =
+          btn.dataset.category === activeCategory ||
+          (activeCategory === 'All' && btn.dataset.category === 'All');
+        btn.dataset.active = isActive ? 'true' : 'false';
+      });
+
+      posts.forEach((post) => {
+        const postCategory = post.dataset.category;
+        const showPost = activeCategory === 'All' || postCategory === activeCategory;
+        post.style.display = showPost ? '' : 'none';
+        if (showPost) visibleCount++;
+      });
+
+      if (emptyState) {
+        emptyState.style.display = visibleCount === 0 ? 'block' : 'none';
+      }
+
+      if (pushState) {
+        const newParams = new URLSearchParams(window.location.search);
+        if (activeCategory === 'All') {
+          newParams.delete('category');
+        } else {
+          newParams.set('category', activeCategory);
+        }
+        const newUrl = `${window.location.pathname}${
+          newParams.toString() ? `?${newParams.toString()}` : ''
+        }`;
+        window.history.replaceState({}, '', newUrl);
+      }
+    };
+
+    buttons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const selectedCategory = btn.dataset.category;
+        if (selectedCategory === activeCategory) return;
+        activeCategory = selectedCategory;
+        updateUI(true);
+      });
+    });
+
+    updateUI(false);
+  };
+
+  document.addEventListener('DOMContentLoaded', initCategoryFilters);
+  document.addEventListener('astro:page-load', initCategoryFilters);
+</script>
+
+<style>
+  :global([data-category-btn]) {
+    background-color: transparent;
+    color: var(--color-text);
+  }
+  :global([data-category-btn][data-active="true"]) {
+    background-color: var(--color-surface);
+    color: var(--color-accent);
+    border-color: var(--color-surface);
+  }
+
+  :global([data-category-btn][data-active="true"] span:last-child) {
+    color: var(--color-accent);
+    opacity: 1;
+  }
+
+  :global([data-category-btn]:hover:not([data-active="true"])) {
+    color: var(--color-accent);
+  }
+</style>

@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Gruvbox Dark (Default) */
+  --color-bg: #03001a;
+  --color-surface: #3c3836;
+  --color-text: #ebdbb2;
+  --color-dim: #a89984;
+  --color-accent: #fabd2f;
+  --color-error: #cc241d;
+  --color-success: #eff300;
+  --color-link: #83a598;
+}
+
+[data-theme="light"] {
+  /* Gruvbox Light */
+  --color-bg: #fbf1c7;
+  --color-surface: #ebdbb2;
+  --color-text: #3c3836;
+  --color-dim: #504943;
+  --color-accent: #d79921;
+  --color-error: #9d0006;
+  --color-success: #79740e;
+  --color-link: #076678;
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: 'JetBrains Mono', monospace;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  background-image: radial-gradient(var(--color-surface) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+/* Hyprland-style Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-dim);
+}
+
+/* Selection Color */
+::selection {
+  background-color: var(--color-accent);
+  color: var(--color-bg);
+}

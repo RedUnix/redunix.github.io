@@ -1,0 +1,156 @@
+---
+import { type CollectionEntry, getCollection, render } from 'astro:content';
+import Layout from '../../layouts/Layout.astro';
+import { TypeIcon } from '../../components/TypeIcon';
+
+export async function getStaticPaths() {
+	const resources = await getCollection('resources');
+	return resources.map((resource) => ({
+		params: { slug: resource.id },
+		props: resource,
+	}));
+}
+type Props = CollectionEntry<'resources'>;
+
+const resource = Astro.props;
+const { Content } = await render(resource);
+
+// Extract YouTube video ID from various URL formats
+function getYouTubeVideoId(url: string): string | null {
+    const patterns = [
+        /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([^&\n?#]+)/,
+        /youtube\.com\/.*[?&]v=([^&\n?#]+)/,
+    ];
+    
+    for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match && match[1]) {
+            return match[1];
+        }
+    }
+    return null;
+}
+
+// Get embed URL for YouTube videos
+function getYouTubeEmbedUrl(url: string): string | null {
+    const videoId = getYouTubeVideoId(url);
+    if (videoId) {
+        return `https://www.youtube.com/embed/${videoId}`;
+    }
+    return null;
+}
+
+function isDirectVideoFile(url: string): boolean {
+    return /\.(mp4|webm|ogg|mov)(?:\?.*)?$/i.test(url);
+}
+
+function getVideoMimeType(url: string): string {
+    const ext = url.split('?')[0].split('.').pop()?.toLowerCase();
+    switch (ext) {
+        case 'mp4':
+            return 'video/mp4';
+        case 'webm':
+            return 'video/webm';
+        case 'ogg':
+            return 'video/ogg';
+        case 'mov':
+            return 'video/quicktime';
+        default:
+            return 'video/mp4';
+    }
+}
+---
+
+<Layout title={resource.data.title}>
+    <article class="animate-fade-in">
+        <div class="mb-8 border-b border-dashed border-dim pb-4">
+            <div class="flex items-center gap-3 mb-4">
+                <div class="p-2 rounded-full bg-surface text-link">
+                    <TypeIcon type={resource.data.type} />
+                </div>
+                <span class="text-xs font-mono opacity-50 border px-2 py-1 rounded border-dim">
+                    {resource.data.type.toUpperCase()}
+                </span>
+                <span class="text-xs font-mono text-dim">{resource.data.topic}</span>
+            </div>
+            <h1 class="text-2xl md:text-3xl font-bold mb-2 text-accent">{resource.data.title}</h1>
+            <div class="flex gap-4 text-xs opacity-70 font-mono text-dim">
+                <span>{resource.data.date.toISOString().split('T')[0]}</span>
+                {resource.data.duration && <span>{resource.data.duration}</span>}
+                {resource.data.domain && <span>{resource.data.domain}</span>}
+                {resource.data.link && (
+                    <a href={resource.data.link} target="_blank" rel="noopener noreferrer" class="text-link hover:text-accent">
+                        External Link →
+                    </a>
+                )}
+            </div>
+        </div>
+
+        {resource.data.type === 'Video' && resource.data.link && (() => {
+            const youtubeEmbedUrl = getYouTubeEmbedUrl(resource.data.link);
+            const isVideoFile = isDirectVideoFile(resource.data.link);
+            return (
+                <div class="mb-6 aspect-video rounded-sm overflow-hidden border border-surface">
+                    {youtubeEmbedUrl ? (
+                        <iframe 
+                            src={youtubeEmbedUrl}
+                            class="w-full h-full"
+                            frameborder="0"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            allowfullscreen
+                            title={resource.data.title}
+                        ></iframe>
+                    ) : resource.data.link.includes('vimeo.com') ? (
+                        <iframe 
+                            src={`https://player.vimeo.com/video/${resource.data.link.split('/').pop()?.split('?')[0]}`}
+                            class="w-full h-full"
+                            frameborder="0"
+                            allow="autoplay; fullscreen; picture-in-picture"
+                            allowfullscreen
+                            title={resource.data.title}
+                        ></iframe>
+                    ) : isVideoFile ? (
+                        <video 
+                            controls 
+                            class="w-full h-full bg-black" 
+                            title={resource.data.title}
+                        >
+                            <source src={resource.data.link} type={getVideoMimeType(resource.data.link)} />
+                            Your browser does not support embedded videos. 
+                            <a href={resource.data.link} target="_blank" rel="noopener noreferrer" class="text-link hover:text-accent">
+                                Download video
+                            </a>
+                        </video>
+                    ) : (
+                        <div class="w-full h-full flex items-center justify-center bg-surface text-dim">
+                            <a href={resource.data.link} target="_blank" rel="noopener noreferrer" class="text-link hover:text-accent">
+                                Watch Video →
+                            </a>
+                        </div>
+                    )}
+                </div>
+            );
+        })()}
+
+        {resource.data.type === 'Audio' && resource.data.audioUrl && (
+            <div class="mb-6 p-4 bg-surface rounded-sm border border-dim">
+                <audio controls class="w-full">
+                    <source src={resource.data.audioUrl} type="audio/mpeg" />
+                    <source src={resource.data.audioUrl} type="audio/ogg" />
+                    Your browser does not support the audio element.
+                </audio>
+            </div>
+        )}
+
+        <div class="prose prose-invert max-w-none prose-headings:font-mono prose-headings:text-accent prose-p:text-text prose-a:text-link hover:prose-a:text-accent prose-pre:bg-surface prose-pre:border prose-pre:border-dim font-mono">
+            <Content />
+        </div>
+
+        {resource.data.comment && (
+            <div class="mt-8 p-4 bg-surface rounded-sm border border-dim">
+                <p class="text-sm text-dim italic">{resource.data.comment}</p>
+            </div>
+        )}
+    </article>
+</Layout>
+
