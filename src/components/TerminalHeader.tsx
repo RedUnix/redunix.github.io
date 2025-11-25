@@ -1,12 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Wifi, Battery, Volume2, Sun, Moon, X, Minimize, Maximize } from 'lucide-react';
+import { Wifi, Battery, Volume2, Sun, Moon, X, Minimize, Maximize, TrendingUp, Newspaper, Radio } from 'lucide-react';
 import { MoonPhaseIcon } from './MoonPhaseIcon';
 import { getMoonPhase } from '../utils/moonPhase';
+import { useMinimized } from '../utils/useMinimized';
 
 export const TerminalHeader = () => {
   const [theme, setTheme] = useState('dark');
   const [currentTime, setCurrentTime] = useState<Date | null>(null); // Start null to avoid hydration mismatch
   const [isMaximized, setIsMaximized] = useState(false);
+  
+  // Minimized state for components
+  const stockTicker = useMinimized('stock-ticker');
+  const newsTicker = useMinimized('news-ticker');
+  const radio = useMinimized('radio');
 
   useEffect(() => {
     setCurrentTime(new Date());
@@ -62,7 +68,7 @@ export const TerminalHeader = () => {
   };
 
   return (
-    <header className="h-10 flex items-center justify-between px-4 border-b select-none bg-surface border-bg">
+    <header className="h-10 flex items-center justify-between px-4 select-none bg-surface flex-1">
       <div className="flex items-center gap-4">
          <div className="flex gap-2">
            <X size={14} className="opacity-50 hover:text-error cursor-pointer" />
@@ -99,6 +105,33 @@ export const TerminalHeader = () => {
             <Volume2 size={14} />
             <span className="hidden sm:inline">65%</span>
          </div>
+         <span className="opacity-50 hidden md:inline">|</span>
+         
+         {/* Component minimize/maximize icons */}
+         <div className="flex items-center gap-2 opacity-70">
+           <button
+             onClick={stockTicker.toggleMinimized}
+             className="p-1 rounded hover:bg-bg transition-colors"
+             title={stockTicker.isMinimized ? 'Show Stock Ticker' : 'Minimize Stock Ticker'}
+           >
+             <TrendingUp size={14} className={stockTicker.isMinimized ? 'text-accent' : ''} />
+           </button>
+           <button
+             onClick={newsTicker.toggleMinimized}
+             className="p-1 rounded hover:bg-bg transition-colors"
+             title={newsTicker.isMinimized ? 'Show News Ticker' : 'Minimize News Ticker'}
+           >
+             <Newspaper size={14} className={newsTicker.isMinimized ? 'text-accent' : ''} />
+           </button>
+           <button
+             onClick={radio.toggleMinimized}
+             className="p-1 rounded hover:bg-bg transition-colors"
+             title={radio.isMinimized ? 'Show Radio' : 'Minimize Radio'}
+           >
+             <Radio size={14} className={radio.isMinimized ? 'text-accent' : ''} />
+           </button>
+         </div>
+         
          <span className="opacity-50 hidden md:inline">|</span>
          <span className="font-mono opacity-80 min-w-[60px] text-right">
             {currentTime ? currentTime.toLocaleTimeString() : '--:--:--'}

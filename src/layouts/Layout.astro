@@ -4,6 +4,8 @@ import { Scanlines } from '../components/Scanlines';
 import { TerminalHeader } from '../components/TerminalHeader';
 import { TerminalFooter } from '../components/TerminalFooter';
 import Navbar from '../components/Navbar.astro';
+import { MinimizedComponents } from '../components/MinimizedComponents';
+import { FullComponents } from '../components/FullComponents';
 import '../styles/global.css';
 
 interface Props {
@@ -48,7 +50,10 @@ const { segments } = getBreadcrumbPath();
         <Scanlines client:load />
         
         <main id="terminal-main" class="w-full max-w-5xl relative z-10 flex flex-col shadow-2xl overflow-hidden md:rounded-lg md:border-2 bg-bg border-surface h-[90vh] min-h-[600px] mx-auto mt-0 md:mt-8">
-            <TerminalHeader client:load />
+            <div class="flex items-center border-b bg-surface border-bg h-10">
+                <TerminalHeader client:load />
+                <MinimizedComponents client:load />
+            </div>
             
             <div class="flex-1 overflow-y-auto p-4 md:p-8 relative scrollbar-thin scrollbar-thumb-surface scrollbar-track-transparent">
                 <Navbar />
@@ -90,7 +95,8 @@ const { segments } = getBreadcrumbPath();
                 </div>
             </div>
 
-            <TerminalFooter />
+            <TerminalFooter client:load />
+            <FullComponents client:load />
         </main>
         <script>
             // Sync maximize state from body to main element on every page
@@ -120,6 +126,147 @@ const { segments } = getBreadcrumbPath();
 
             document.addEventListener('DOMContentLoaded', initMaximizeSync);
             document.addEventListener('astro:page-load', initMaximizeSync);
+        </script>
+        <script>
+            // Monitor YouTube iframes and pause radio when videos start playing
+            (function() {
+                let youtubePlayers = new Map();
+                let messageHandlers = new Map();
+                let isYouTubeAPILoaded = false;
+
+                function loadYouTubeAPI() {
+                    if (isYouTubeAPILoaded || document.querySelector('script[src*="youtube.com/iframe_api"]')) return;
+                    
+                    const tag = document.createElement('script');
+                    tag.src = 'https://www.youtube.com/iframe_api';
+                    const firstScriptTag = document.getElementsByTagName('script')[0];
+                    firstScriptTag.parentNode.insertBefore(tag, firstScriptTag);
+                    isYouTubeAPILoaded = true;
+                }
+
+                function findYouTubeIframes() {
+                    return document.querySelectorAll('iframe[src*="youtube"], iframe[src*="youtu.be"]');
+                }
+
+                function initYouTubePlayer(iframe) {
+                    if (youtubePlayers.has(iframe)) return;
+
+                    // Use YouTube iframe API if available
+                    if (window.YT && window.YT.Player) {
+                        try {
+                            const player = new window.YT.Player(iframe, {
+                                events: {
+                                    onStateChange: function(event) {
+                                        // State 1 = playing
+                                        if (event.data === 1) {
+                                            window.dispatchEvent(new CustomEvent('youtube-video-playing'));
+                                        }
+                                    }
+                                }
+                            });
+                            youtubePlayers.set(iframe, player);
+                        } catch (e) {
+                            console.warn('Could not initialize YouTube player:', e);
+                            setupPostMessageFallback(iframe);
+                        }
+                    } else {
+                        setupPostMessageFallback(iframe);
+                    }
+                }
+
+                function setupPostMessageFallback(iframe) {
+                    if (messageHandlers.has(iframe)) return;
+
+                    const messageHandler = (event) => {
+                        // Check if message is from this iframe
+                        if (event.source !== iframe.contentWindow) return;
+                        
+                        try {
+                            if (typeof event.data === 'string') {
+                                const data = JSON.parse(event.data);
+                                // YouTube iframe API sends state change events
+                                if (data.event === 'onStateChange' && data.info === 1) {
+                                    window.dispatchEvent(new CustomEvent('youtube-video-playing'));
+                                }
+                            }
+                        } catch (e) {
+                            // Not a YouTube message, ignore
+                        }
+                    };
+                    
+                    window.addEventListener('message', messageHandler);
+                    messageHandlers.set(iframe, messageHandler);
+                }
+
+                function monitorYouTubeIframes() {
+                    const iframes = findYouTubeIframes();
+                    iframes.forEach(iframe => {
+                        if (!youtubePlayers.has(iframe) && !messageHandlers.has(iframe)) {
+                            initYouTubePlayer(iframe);
+                        }
+                    });
+                }
+
+                // Global message listener for YouTube postMessage events
+                function setupGlobalMessageListener() {
+                    window.addEventListener('message', (event) => {
+                        // Check if message is from YouTube
+                        if (event.origin !== 'https://www.youtube.com' && 
+                            event.origin !== 'https://www.youtube-nocookie.com') {
+                            return;
+                        }
+
+                        try {
+                            if (typeof event.data === 'string') {
+                                const data = JSON.parse(event.data);
+                                if (data.event === 'onStateChange' && data.info === 1) {
+                                    window.dispatchEvent(new CustomEvent('youtube-video-playing'));
+                                }
+                            }
+                        } catch (e) {
+                            // Not a YouTube message, ignore
+                        }
+                    });
+                }
+
+                // Initialize on page load
+                function init() {
+                    setupGlobalMessageListener();
+                    loadYouTubeAPI();
+                    
+                    // Wait for YouTube API to load
+                    if (window.YT) {
+                        window.YT.ready(monitorYouTubeIframes);
+                    } else {
+                        const originalReady = window.onYouTubeIframeAPIReady;
+                        window.onYouTubeIframeAPIReady = function() {
+                            if (originalReady) originalReady();
+                            monitorYouTubeIframes();
+                        };
+                    }
+                    
+                    // Also monitor for new iframes
+                    const observer = new MutationObserver(() => {
+                        monitorYouTubeIframes();
+                    });
+                    
+                    observer.observe(document.body, { childList: true, subtree: true });
+                    monitorYouTubeIframes();
+                }
+
+                if (document.readyState === 'loading') {
+                    document.addEventListener('DOMContentLoaded', init);
+                } else {
+                    init();
+                }
+
+                // Re-initialize on Astro page transitions
+                document.addEventListener('astro:page-load', () => {
+                    youtubePlayers.clear();
+                    messageHandlers.clear();
+                    setTimeout(monitorYouTubeIframes, 500);
+                });
+            })();
         </script>
         <style>
             @media (min-width: 768px) {

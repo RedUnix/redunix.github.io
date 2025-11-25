@@ -189,11 +189,14 @@ export function MediaPlayer({ playlists }: Props) {
                     {playlist.note && <p className="text-[11px] text-dim">{playlist.note}</p>}
                   </div>
                   <button
-                    className="text-[11px] uppercase tracking-wide text-dim hover:text-accent"
+                    className={[
+                      'text-[11px] uppercase tracking-wide transition-colors',
+                      playlist.id === activePlaylistId ? 'text-accent' : 'text-dim hover:text-accent',
+                    ].join(' ')}
                     onClick={() => handleSelectPlaylist(playlist.id)}
                     type="button"
                   >
-                    Activate
+                    {playlist.id === activePlaylistId ? 'Active' : 'Activate'}
                   </button>
                 </div>
                 <ul className="divide-y divide-surface">
